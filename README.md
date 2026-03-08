@@ -147,3 +147,94 @@ stop
 @enduml
 ```
 <img width="807" height="876" alt="image" src="https://github.com/user-attachments/assets/6ea1180d-14b9-44e2-b184-a8451b111d99" />
+
+# Диаграмма классов (classes)
+
+```
+@startuml
+title Диаграмма классов\nКраеведческий веб-ресурс
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam nodesep 150
+skinparam ranksep 150
+skinparam padding 10
+package "Справочные модели" #E6F3FF {
+  class Street {
+    +id: Integer
+    +name: String
+    __
+    +__str__(): String
+  }
+  
+  class Profession {
+    +id: Integer
+    +name: String
+    __
+    +__str__(): String
+  }
+  
+  class Book {
+    +id: Integer
+    +author: String
+    +title: String
+    +url: String
+    +image: ImageField
+    __
+    +__str__(): String
+  }
+  
+  class Keyword {
+    +id: Integer
+    +keyword: String
+    __
+    +__str__(): String
+  }
+}
+package "Основные модели" #FFE6E6 {
+  class Event {
+    +id: Integer
+    +title: String
+    +date: Date
+    +description_html: Text
+    +image: ImageField
+    __
+    +__str__(): String
+    +day: Integer
+    +month: Integer
+  }
+  
+  class Person {
+    +id: Integer
+    +last_name: String
+    +first_name: String
+    +middle_name: String
+    +birth_date: Date
+    +death_date: Date
+    +description_html: Text
+    +article_html: Text
+    +image: ImageField
+    __
+    +__str__(): String
+    +full_name: String
+    +short_name: String
+  }
+}
+Event   -->  Street : 0..1
+Event   --   Person : M:N
+Event   ..>  Keyword : M:N
+Event   ..>  Book : M:N
+Person  ..>  Profession : M:N
+Person  ..>  Street : M:N
+Person  ..>  Book : M:N
+Person  ..>  Keyword : M:N
+legend bottom
+  ──> = ForeignKey
+  ─ ─ = ManyToMany
+  M:N = многие-ко-многим
+  0..1 = опционально
+endlegend
+@enduml
+```
+
+<img width="1168" height="1715" alt="image" src="https://github.com/user-attachments/assets/cbe5e3c3-8844-41e5-bc12-36e7f3d06f49" />
+
