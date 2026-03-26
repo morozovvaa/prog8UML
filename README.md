@@ -154,6 +154,156 @@ stop
 ```
 <img width="807" height="836" alt="image" src="https://github.com/user-attachments/assets/dca1f256-14e4-4572-bd3e-f161679fa1d7" />
 
+# Диаграмма последовательности (sequence)
+
+Раскрывает динамику взаимодействия компонентов во времени. Показывает два сценария: поиск материалов посетителем и создание события администратором. В первом сценарии: браузер (Next.js) отправляет GET-запрос к REST API (Django), который делает SQL-запрос к PostgreSQL и возвращает JSON. Во втором сценарии: перед записью в БД API обязательно проверяет JWT-токен; при невалидном токене возвращает HTTP 401.
+
+```
+@startuml
+title Диаграмма последовательности\nКраеведческий веб-ресурс
+
+skinparam sequenceArrowThickness 2
+skinparam sequenceGroupBorderColor #888888
+skinparam sequenceLifeLineBorderColor #555555
+
+actor "Посетитель" as Visitor
+participant "Браузер\n(Next.js)" as Browser
+participant "REST API\n(Django)" as API
+database "База данных\n(PostgreSQL)" as DB
+
+== Сценарий 1: Поиск материалов ==
+
+Visitor -> Browser : Вводит поисковый запрос\n(например: «Менделеев»)
+activate Browser
+
+Browser -> API : GET /api/search/?q=Менделеев
+activate API
+
+API -> DB : SELECT events, persons\nWHERE title/name ILIKE '%Менделеев%'
+activate DB
+DB --> API : Список совпадений
+deactivate DB
+
+API --> Browser : HTTP 200\nJSON { events: [...], persons: [...] }
+deactivate API
+
+Browser --> Visitor : Отображение результатов поиска
+deactivate Browser
+
+Visitor -> Browser : Выбирает персону из результатов
+activate Browser
+
+Browser -> API : GET /api/persons/{id}/
+activate API
+
+API -> DB : SELECT person + профессии\n+ улицы + книги + теги
+activate DB
+DB --> API : Полные данные персоны
+deactivate DB
+
+API --> Browser : HTTP 200\nJSON { person: {...} }
+deactivate API
+
+Browser --> Visitor : Отображение страницы персоны
+deactivate Browser
+
+== Сценарий 2: Создание события администратором ==
+
+actor "Администратор" as Admin
+
+Admin -> Browser : Открывает форму\nсоздания события
+activate Browser
+
+Browser -> API : POST /api/events/\n{ title, date, description, ... }\nAuthorization: Bearer <token>
+activate API
+
+API -> API : Проверка токена
+
+alt Токен недействителен
+    API --> Browser : HTTP 401 Unauthorized
+    Browser --> Admin : Перенаправление\nна страницу входа
+else Токен действителен
+    API -> DB : INSERT INTO events (...)\n+ привязка M:N (персоны, теги, книги)
+    activate DB
+    DB --> API : id нового события
+    deactivate DB
+
+    API --> Browser : HTTP 201 Created\nJSON { id: 42, title: ... }
+    deactivate API
+
+    Browser --> Admin : Редирект на страницу\nнового события
+end
+
+deactivate Browser
+
+@enduml
+```
+
+<img width="1081" height="1179" alt="image" src="https://github.com/user-attachments/assets/f941b8ce-5678-426d-b9b0-895f6d604d2f" />
+
+
+# Диаграмма состояний (state)
+
+Раскрывает динамику поведения объекта на протяжении всего жизненного цикла. Моделирует сущность Event: от создания через заполнение формы → сохранение в БД (объект становится доступен посетителям) → редактирование → повторное сохранение или отмена → подтверждение удаления → удаление из БД. Ключевое рабочее состояние — «Сохранённое»: только в нём объект виден посетителям через публичный API.
+
+```
+@startuml
+title Диаграмма состояний\nЖизненный цикл сущности «Событие»
+
+skinparam state {
+  BackgroundColor AliceBlue
+  BorderColor #4A90D9
+  ArrowColor #333333
+  StartColor #2C7BB6
+  EndColor #D9534F
+}
+
+[*] --> Новое : Администратор нажимает\n«Создать событие»
+
+state Новое {
+  [*] --> ЗаполнениеОсновных
+  ЗаполнениеОсновных --> ДобавлениеСвязей : Заполнены обязательные\nполя (title, date)
+  ДобавлениеСвязей --> ГотовоКСохранению : Выбраны персоны,\nтеги, книги
+}
+
+Новое --> Сохранённое : POST /api/events/\n[форма прошла валидацию]
+
+state Сохранённое
+
+note right of Сохранённое : Доступно посетителям\nчерез GET /api/events/
+
+Сохранённое --> Редактируется : Администратор нажимает\n«Редактировать»
+
+state Редактируется {
+  [*] --> ИзменениеДанных
+  ИзменениеДанных --> ОбновлениеСвязей : Изменены основные поля
+  ОбновлениеСвязей --> ГотовоКОбновлению : Связи скорректированы
+}
+
+Редактируется --> Сохранённое : PATCH /api/events/{id}/\n[изменения подтверждены]
+Редактируется --> Сохранённое : Администратор нажимает\n«Отмена»
+
+Сохранённое --> ПодтверждениеУдаления : Администратор нажимает\n«Удалить»
+
+state ПодтверждениеУдаления
+
+note right of ПодтверждениеУдаления : Модальное окно\nподтверждения
+
+ПодтверждениеУдаления --> Сохранённое : Нажата «Отмена»
+ПодтверждениеУдаления --> Удалено : DELETE /api/events/{id}/\nНажато «Подтвердить»
+
+Удалено --> [*]
+
+note bottom of Сохранённое
+  Состояние «Сохранённое» является
+  основным рабочим состоянием объекта.
+  Посетители видят событие только в этом состоянии.
+end note
+@enduml
+```
+
+<img width="1328" height="1400" alt="image" src="https://github.com/user-attachments/assets/1ea68f46-cf2e-46db-98e9-6e3252b88a94" />
+
 
 # Диаграмма классов (classes)
 
